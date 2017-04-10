@@ -8,7 +8,7 @@
 -module(server).
 
 -export([register_user/2, log_in/2, log_out/2, join_channel/3, send_message/4,
-         get_channel_history/2]).
+         get_channel_history/2, get_members/2, get_currently_logged_in/2]).
 
 %%
 %% Server API
@@ -75,6 +75,24 @@ get_channel_history(ServerPid, ChannelName) ->
         {_ResponsePid, channel_history, Messages} ->
             Messages
     end.
+
+-spec get_members(pid(), string()) -> list(string()).
+get_members(ServerPid, ChannelName) ->
+    ServerPid ! {self(), members, ChannelName},
+    receive
+        {_Channel, members, Members} ->
+            Members
+    end.
+
+-spec get_currently_logged_in(pid(), string()) -> list(string()).
+get_currently_logged_in(ServerPid, ChannelName) ->
+    io:fwrite("get_currently_logged_in~n"),
+    ServerPid ! {self(), logged_in, ChannelName},
+    receive
+        {_Channel, logged_in, Logged_in} ->
+            Logged_in
+    end.
+
 
 %%
 %% Client API
