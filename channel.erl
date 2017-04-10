@@ -18,7 +18,8 @@ channel_loop(ChannelName, Users, Messages, Members) ->
 		%% Todo, is sender member of users?
 		{Sender, send_message, UserName, MessageText, SendTime} ->
 			Message = {message, UserName, ChannelName, MessageText, SendTime},
-			spawn_link(channel, broadcast, [Users, Message]),
+			UserWithoutSender = dict:erase(UserName, Users),
+			spawn_link(channel, broadcast, [UserWithoutSender, Message]),
 			Sender ! {self(), message_sent},
 			channel_loop(ChannelName, Users, Messages ++ [Message], Members);
 
