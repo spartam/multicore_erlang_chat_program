@@ -32,13 +32,13 @@ channel_loop(ChannelName, Users, Messages, Members) ->
 					channel_loop(ChannelName, Users, Messages, Members)
 			end;
 
-		{_Sender, register, UserName} ->
+		{Sender, register, UserName} ->
 			case lists:member(UserName, Members) of 
 				true ->
-					% Sender ! {self(), register, already_member},
+					Sender ! {self(), already_member},
 					channel_loop(ChannelName, Users, Messages, Members);
 				false ->
-					% Sender ! {self(), register, succesfull},
+					Sender ! {self(), channel_joined},
 					channel_loop(ChannelName, Users, Messages, Members ++ [UserName])
 			end;
 
@@ -50,6 +50,10 @@ channel_loop(ChannelName, Users, Messages, Members) ->
 		{_Sender, logout, UserName} ->
 			NewUsers = dict:erase(UserName, Users),
 			channel_loop(ChannelName, NewUsers, Messages, Members);
+
+		{Sender, members} ->
+			Sender ! {members, Members},
+			channel_loop(ChannelName, Users, Messages, Members);
 
 		Other ->
 			channel_loop(ChannelName, Users, Messages, Members)

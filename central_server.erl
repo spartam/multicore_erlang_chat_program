@@ -1,11 +1,14 @@
 -module(central_server).
 
 % -export([initialize/0, initialize_with/3, central_server/3, typical_session_1/1, typical_session_2/1]).
--export([initialize/0, initialize_with/3, test/0, init_central_server/3]).
+-export([initialize/0, initialize_with/3, init_central_server/3]).
+
+-include_lib("eunit/include/eunit.hrl").
 
 %% Code from server_centralized
 initialize() ->
-    initialize_with(dict:new(), sets:new(), dict:new()).
+    PID = initialize_with(dict:new(), sets:new(), dict:new()),
+    PID.
 
 initialize_with(Users, LoggedIn, Channels) ->
     ServerPid = spawn_link(?MODULE, init_central_server, [Users, LoggedIn, Channels]),
@@ -49,7 +52,7 @@ server_loop(Users, LoggedIn, Channels) ->
 			server_loop(Users, New_LoggedIn, Channels);
 
 		{Sender, log_out, UserName} ->
-			New_LoggedIn = sets:de_element(UserName, LoggedIn),
+			New_LoggedIn = sets:del_element(UserName, LoggedIn),
 			broadcast(Channels, {self(), logout, UserName, Sender}),
 			Sender ! {self(), logged_out},
 			server_loop(Users, New_LoggedIn, Channels);
@@ -66,7 +69,7 @@ server_loop(Users, LoggedIn, Channels) ->
 			NewChannels = send_to_channel(ChannelName, Channels, {Sender, history}),
 			server_loop(Users, LoggedIn, NewChannels);
 
-		Other -> 
+		_Other -> 
 			server_loop(Users, LoggedIn, Channels)
 	end.
 
@@ -97,32 +100,96 @@ send_to_channel(Channel, Channels, Message) ->
 
 
 
-test() ->
-	NumberOfChannels = 100000,
-    NumberOfUsers = 50000,
-    % ChannelNames = ["alpha", "bravo", "charlie", "delta", "echo", "foxtrot", "golf", "hotel", "india", "juliet"],
-    ChannelNames = lists:seq(1, NumberOfChannels),
-    UserNames = lists:seq(1, NumberOfUsers),
-    Channels = dict:from_list(lists:map(fun (Name) ->
-        Messages = [{message, 5, Name, "Hello!", os:system_time()},
-                    {message, 6, Name, "Hi!", os:system_time()},
-                    {message, 5, Name, "Bye!", os:system_time()}],
-        Channel = {channel, Name, Messages},
-        {Name, Channel}
-        end,
-        ChannelNames)),
-    Users = dict:from_list(lists:map(fun (Name) ->
-        Subscriptions = [rand:uniform(NumberOfChannels),
-                         rand:uniform(NumberOfChannels),
-                         rand:uniform(NumberOfChannels)],
-        User = {user, Name, sets:from_list(Subscriptions)},
-        {Name, User}
-        end,
-        UserNames)),
+% test() ->
+% 	NumberOfChannels = 100000,
+%     NumberOfUsers = 50000,
+%     % ChannelNames = ["alpha", "bravo", "charlie", "delta", "echo", "foxtrot", "golf", "hotel", "india", "juliet"],
+%     ChannelNames = lists:seq(1, NumberOfChannels),
+%     UserNames = lists:seq(1, NumberOfUsers),
+%     Channels = dict:from_list(lists:map(fun (Name) ->
+%         Messages = [{message, 5, Name, "Hello!", os:system_time()},
+%                     {message, 6, Name, "Hi!", os:system_time()},
+%                     {message, 5, Name, "Bye!", os:system_time()}],
+%         Channel = {channel, Name, Messages},
+%         {Name, Channel}
+%         end,
+%         ChannelNames)),
+%     Users = dict:from_list(lists:map(fun (Name) ->
+%         Subscriptions = [rand:uniform(NumberOfChannels),
+%                          rand:uniform(NumberOfChannels),
+%                          rand:uniform(NumberOfChannels)],
+%         User = {user, Name, sets:from_list(Subscriptions)},
+%         {Name, User}
+%         end,
+%         UserNames)),
 
-    ServerPid = initialize_with(Users, [], Channels),
-    ServerPid ! {self(), get_channel_history, 3}.
-    % receive
-    %     {_ResponsePid, channel_history, Messages} ->
-    %         io:fwrite("~p~n", [Messages])
-    % end.
+%     ServerPid = initialize_with(Users, [], Channels),
+%     ServerPid ! {self(), get_channel_history, 3}.
+%     % receive
+%     %     {_ResponsePid, channel_history, Messages} ->
+%     %         io:fwrite("~p~n", [Messages])
+%     % end.
+
+initialize_test() ->
+	catch unregister(central_server),
+	initialize().
+
+register_user_test() ->
+   	initialize_test(),
+    ?assertMatch({_, user_registered}, server:register_user(central_server, "A")),
+    ?assertMatch({_, user_registered}, server:register_user(central_server, "B")),
+    ?assertMatch({_, user_registered}, server:register_user(central_server, "C")),
+    ?assertMatch({_, user_registered}, server:register_user(central_server, "D")),
+    ["A", "B", "C", "D"].
+
+log_in_test() ->
+    [UserName1, UserName2 | _] = register_user_test(),
+    ?assertMatch({_Server1, logged_in}, server:log_in(central_server, UserName1)),
+    ?assertMatch({_Server2, logged_in}, server:log_in(central_server, UserName2)).
+    % Note: returned pids _Server1 and _Server2 do not necessarily need to be
+    % the same.
+
+log_out_test() ->
+    [UserName1, UserName2 | _] = register_user_test(),
+    {Server1, logged_in} = server:log_in(central_server, UserName1),
+    {Server2, logged_in} = server:log_in(central_server, UserName2),
+    ?assertMatch(logged_out, server:log_out(Server1, UserName1)),
+    ?assertMatch(logged_out, server:log_out(Server2, UserName2)).
+
+join_channel_test() ->
+    [UserName1 | _] = register_user_test(),
+    {Server1, logged_in} = server:log_in(central_server, UserName1),
+    ?assertMatch(channel_joined,
+        server:join_channel(Server1, UserName1, "Channel1")),
+    ?assertMatch(channel_joined,
+        server:join_channel(Server1, UserName1, "Channel2")),
+    {UserName1, Server1, "Channel1", "Channel2"}.
+
+send_message_test() ->
+    {UserName1, Server1, Channel1, _Channel2} = join_channel_test(),
+    ?assertMatch(message_sent,
+        server:send_message(Server1, UserName1, Channel1, "Hello!")),
+    ?assertMatch(message_sent,
+        server:send_message(Server1, UserName1, Channel1, "How are you?")).
+
+channel_history_test() ->
+    % Create users, log in, join channels.
+    [UserName1, UserName2 | _] = register_user_test(),
+    {Server1, logged_in} = server:log_in(central_server, UserName1),
+    {Server2, logged_in} = server:log_in(central_server, UserName2),
+    Channel1 = "Channel1",
+    server:join_channel(Server1, UserName1, Channel1),
+    server:join_channel(Server2, UserName2, Channel1),
+
+    % Send some messages
+    server:send_message(Server1, UserName1, Channel1, "Hello!"),
+    server:send_message(Server2, UserName2, Channel1, "Hi!"),
+    server:send_message(Server1, UserName1, Channel1, "How are you?"),
+
+    % Check history
+    [{message, UserName1, Channel1, "Hello!", Time1},
+     {message, UserName2, Channel1, "Hi!", Time2},
+     {message, UserName1, Channel1, "How are you?", Time3}] =
+        server:get_channel_history(Server1, Channel1),
+    ?assert(Time1 =< Time2),
+    ?assert(Time2 =< Time3).

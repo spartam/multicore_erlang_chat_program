@@ -5,6 +5,7 @@ all: $(BEAM) test
 
 test:
 	./run.sh server_centralized test
+	./run.sh central_server test
 
 benchmark: $(BEAM)
 	./run_benchmarks.sh
