@@ -18,8 +18,11 @@ channel_loop(ChannelName, Users, Messages, Members) ->
 		%% Todo, is sender member of users?
 		{Sender, send_message, UserName, MessageText, SendTime} ->
 			Message = {message, UserName, ChannelName, MessageText, SendTime},
-			UserWithoutSender = dict:erase(UserName, Users),
-			spawn_link(channel, broadcast, [UserWithoutSender, Message]),
+			UsersWithoutSender = dict:erase(UserName, Users),
+			% Size = dict:size(UsersWithoutSender),
+			% io:fwrite("Size: ~w~n", [Size]),
+			spawn_link(?MODULE, broadcast, [UsersWithoutSender, Message]),
+			% broadcast(UsersWithoutSender, Message),
 			Sender ! {self(), message_sent},
 			channel_loop(ChannelName, Users, Messages ++ [Message], Members);
 
@@ -44,6 +47,16 @@ channel_loop(ChannelName, Users, Messages, Members) ->
 					channel_loop(ChannelName, NewUsers, Messages, Members ++ [UserName])
 			end;
 
+		{Sender, register, UserName, no_login} ->
+			case lists:member(UserName, Members) of 
+				true ->
+					Sender ! {self(), already_member},
+					channel_loop(ChannelName, Users, Messages, Members);
+				false ->
+					Sender ! {self(), channel_joined},
+					channel_loop(ChannelName, Users, Messages, Members ++ [UserName])
+			end;
+
 		{_Sender, unregister, UserName} ->
 			NewUsers = dict:erase(UserName, Users),
 			NewMembers = lists:delete(UserName, Members),
@@ -63,6 +76,7 @@ channel_loop(ChannelName, Users, Messages, Members) ->
 			channel_loop(ChannelName, Users, Messages, Members);
 
 		Other ->
+			io:fwrite("~p", [Other]),
 			channel_loop(ChannelName, Users, Messages, Members)
 	end.
 

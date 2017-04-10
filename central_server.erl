@@ -89,7 +89,7 @@ register_user_to_channels(User, Channels, Channels_PID) ->
 
 register_user_to_channel(User, Channel, Channels) ->
 	Channel_Process = dict:fetch(Channel, Channels),
-	Channel_Process ! {self(), register, User}.
+	Channel_Process ! {self(), register, User, no_login}.
 
 
 broadcast(Channels, Message) ->
