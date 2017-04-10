@@ -18,7 +18,7 @@ channel_loop(ChannelName, Users, Messages, Members) ->
 		%% Todo, is sender member of users?
 		{Sender, send_message, UserName, MessageText, SendTime} ->
 			Message = {message, UserName, ChannelName, MessageText, SendTime},
-			spawn_link(?MODULE, broadcast, [Users, Message]),
+			spawn_link(channel, broadcast, [Users, Message]),
 			Sender ! {self(), message_sent},
 			channel_loop(ChannelName, Users, Messages ++ [Message], Members);
 
@@ -39,7 +39,8 @@ channel_loop(ChannelName, Users, Messages, Members) ->
 					channel_loop(ChannelName, Users, Messages, Members);
 				false ->
 					Sender ! {self(), channel_joined},
-					channel_loop(ChannelName, Users, Messages, Members ++ [UserName])
+					NewUsers = dict:store(UserName, Sender, Users),
+					channel_loop(ChannelName, NewUsers, Messages, Members ++ [UserName])
 			end;
 
 		{_Sender, unregister, UserName} ->
@@ -52,7 +53,12 @@ channel_loop(ChannelName, Users, Messages, Members) ->
 			channel_loop(ChannelName, NewUsers, Messages, Members);
 
 		{Sender, members} ->
-			Sender ! {members, Members},
+			Sender ! {self(), members, Members},
+			channel_loop(ChannelName, Users, Messages, Members);
+
+		{Sender, logged_in} ->
+			Logged_in = dict:fetch_keys(Users),
+			Sender ! {self(), logged_in, Logged_in},
 			channel_loop(ChannelName, Users, Messages, Members);
 
 		Other ->

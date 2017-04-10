@@ -1,7 +1,7 @@
 -module(central_server).
 
 % -export([initialize/0, initialize_with/3, central_server/3, typical_session_1/1, typical_session_2/1]).
--export([initialize/0, initialize_with/3, init_central_server/3]).
+-export([initialize/0, initialize_with/3, init_central_server/3, typical_session_1/1, typical_session_2/1]).
 
 -include_lib("eunit/include/eunit.hrl").
 
@@ -69,6 +69,14 @@ server_loop(Users, LoggedIn, Channels) ->
 			NewChannels = send_to_channel(ChannelName, Channels, {Sender, history}),
 			server_loop(Users, LoggedIn, NewChannels);
 
+		{Sender, members, ChannelName} ->
+			NewChannels = send_to_channel(ChannelName, Channels, {Sender, members}),
+			server_loop(Users, LoggedIn, NewChannels);		
+
+		{Sender, logged_in, ChannelName} ->
+			NewChannels = send_to_channel(ChannelName, Channels, {Sender, logged_in}),
+			server_loop(Users, LoggedIn, NewChannels);	
+
 		_Other -> 
 			server_loop(Users, LoggedIn, Channels)
 	end.
@@ -132,6 +140,7 @@ send_to_channel(Channel, Channels, Message) ->
 
 initialize_test() ->
 	catch unregister(central_server),
+	io:fwrite("test~n"),
 	initialize().
 
 register_user_test() ->
@@ -158,11 +167,21 @@ log_out_test() ->
 
 join_channel_test() ->
     [UserName1 | _] = register_user_test(),
+    io:fwrite("Users registered~n"),
     {Server1, logged_in} = server:log_in(central_server, UserName1),
+    io:fwrite("User logged in~n"),
     ?assertMatch(channel_joined,
         server:join_channel(Server1, UserName1, "Channel1")),
+    io:fwrite("Joined channel1~n"),
     ?assertMatch(channel_joined,
         server:join_channel(Server1, UserName1, "Channel2")),
+    io:fwrite("Joined channel2~n"),
+    io:fwrite("get members test~n"),
+    ?assertMatch([UserName1],
+        server:get_members(Server1, "Channel1")),
+    io:fwrite("get logged in test~n"),
+    ?assertMatch([UserName1],
+        server:get_currently_logged_in(Server1, "Channel1")),
     {UserName1, Server1, "Channel1", "Channel2"}.
 
 send_message_test() ->
@@ -193,3 +212,71 @@ channel_history_test() ->
         server:get_channel_history(Server1, Channel1),
     ?assert(Time1 =< Time2),
     ?assert(Time2 =< Time3).
+
+typical_session_test() ->
+    initialize_test(),
+    Session1 = spawn_link(?MODULE, typical_session_1, [self()]),
+    Session2 = spawn_link(?MODULE, typical_session_2, [self()]),
+    receive
+        {Session1, ok} ->
+            receive
+                {Session2, ok} ->
+                    done
+            end
+    end.
+
+typical_session_1(TesterPid) ->
+    {_, user_registered} = server:register_user(central_server, "Jennifer"),
+    {Server, logged_in} = server:log_in(central_server, "Jennifer"),
+    channel_joined = server:join_channel(Server, "Jennifer", "multicore"),
+    message_sent = server:send_message(Server, "Jennifer", "multicore", "Hello!"),
+    % Wait for reply
+    Time2 = receive
+        {_, new_message, Message} ->
+            ?assertMatch({message, "Janwillem", "multicore", "Hi!", _}, Message),
+            {message, _, _, _, Time} = Message,
+            Time
+    end,
+    % Respond
+    message_sent = server:send_message(Server, "Jennifer", "multicore", "How are you?"),
+
+    % Check history
+    [{message, "Jennifer",  "multicore", "Hello!",       Time1},
+     {message, "Janwillem", "multicore", "Hi!",          Time2},
+     {message, "Jennifer",  "multicore", "How are you?", Time3}] =
+        server:get_channel_history(Server, "multicore"),
+    ?assert(Time1 =< Time2),
+    ?assert(Time2 =< Time3),
+
+    TesterPid ! {self(), ok}.
+
+typical_session_2(TesterPid) ->
+    {_, user_registered} = server:register_user(central_server, "Janwillem"),
+    {Server, logged_in} = server:log_in(central_server, "Janwillem"),
+    channel_joined = server:join_channel(Server, "Janwillem", "multicore"),
+    % Wait for first message
+    Time1 = receive
+        {_, new_message, Message1} ->
+            ?assertMatch({message, "Jennifer", "multicore", "Hello!", _}, Message1),
+            {message, _, _, _, Time} = Message1,
+            Time
+    end,
+    % Reply
+    message_sent = server:send_message(Server, "Janwillem", "multicore", "Hi!"),
+    % Wait for response
+    Time3 = receive
+        {_, new_message, Message3} ->
+            ?assertMatch({message, "Jennifer", "multicore", "How are you?", _}, Message3),
+            {message, _, _, _, Time_} = Message3,
+            Time_
+    end,
+
+    % Check history
+    [{message, "Jennifer",  "multicore", "Hello!",       Time1},
+     {message, "Janwillem", "multicore", "Hi!",          Time2},
+     {message, "Jennifer",  "multicore", "How are you?", Time3}] =
+        server:get_channel_history(Server, "multicore"),
+    ?assert(Time1 =< Time2),
+    ?assert(Time2 =< Time3),
+
+    TesterPid ! {self(), ok}.
