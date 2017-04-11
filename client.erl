@@ -2,17 +2,39 @@
 
 -export([client/1]).
 
-client(UserName) ->
-	clientloop(UserName, dict:new()).
-
-
-clientloop(UserName, Channels) ->
+client(UserName, Server, register) ->
+	Server ! {self(), register_user, UserName},
 	receive
-		{ChannelServer, channel_joined, Name} ->
-			NewChannels = join_channel(Name, ChannelServer, Channels);
+		{Server, user_registered} ->
+			clientloop(UserName, dict:new(), Server)
+	end.
 
-		{ServerPid, new_message, {message, UserName, ChannelName, MessageText, SendTime}} ->
-			{message, UserName, ChannelName, MessageText, SendTime}
+client(UserName, Server, login) ->
+	Server ! {self(), log_in, UserName},
+	receive
+		{Server, logged_in} ->
+		clientloop(UserName, dict:new(), Server)
+	end.
+
+
+clientloop(UserName, Channels, Server) ->
+	receive
+		{ChannelServer, logged_in_channel, Name} ->
+			NewChannels = join_channel(Name, ChannelServer, Channels),
+			clientloop(UserName, NewChannels, Server);
+
+		{ChannelID, new_message, {message, UserName, ChannelName, MessageText, SendTime}} ->
+			io:fwrite("~p - [~p]~p: ~p", [SendTime, ChannelName, UserName, MessageText]),
+			clientloop(UserName, NewChannels, Server);
+
+		{ChannelID, channel_joined, ChannelName} ->
+			NewChannels = join_channel(ChannelName, ChannelID, Channels),
+			clientloop(UserName, NewChannels, Server);
+
+		{_Client, join_channel, ChannelName} ->
+			Server ! {self(), join_channel, UserName, ChannelName},
+			clientloop(UserName, NewChannels, Server);
+
 	end.
 
 

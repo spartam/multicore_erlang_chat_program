@@ -30,7 +30,7 @@ channel_loop(ChannelName, Users, Messages, Members) ->
 			case logged_out_member_check(UserName, Users, Members) of 
 				true -> 
 					NewUsers = dict:store(UserName, PID, Users),
-					% Sender ! {self(), logged_in_channel, ChannelName},
+					Sender ! {self(), logged_in_channel, ChannelName},
 					channel_loop(ChannelName, NewUsers, Messages, Members);
 				false ->
 					channel_loop(ChannelName, Users, Messages, Members)
@@ -42,7 +42,7 @@ channel_loop(ChannelName, Users, Messages, Members) ->
 					Sender ! {self(), already_member},
 					channel_loop(ChannelName, Users, Messages, Members);
 				false ->
-					Sender ! {self(), channel_joined},
+					Sender ! {self(), channel_joined, ChannelName},
 					NewUsers = dict:store(UserName, Sender, Users),
 					channel_loop(ChannelName, NewUsers, Messages, Members ++ [UserName])
 			end;
