@@ -26,7 +26,7 @@ channel_loop(ChannelName, Users, Messages, Members) ->
 			Sender ! {self(), message_sent},
 			channel_loop(ChannelName, Users, Messages ++ [Message], Members);
 
-		{_Sender, login, UserName, PID} ->
+		{Sender, login, UserName, PID} ->
 			case logged_out_member_check(UserName, Users, Members) of 
 				true -> 
 					NewUsers = dict:store(UserName, PID, Users),

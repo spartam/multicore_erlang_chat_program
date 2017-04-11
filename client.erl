@@ -1,14 +1,15 @@
 -module(client).
 
--export([client/1]).
+-export([client/3]).
 
 client(UserName, Server, register) ->
+	io:fwrite("make client: ~p~n", [UserName]),
 	Server ! {self(), register_user, UserName},
 	receive
 		{Server, user_registered} ->
+			io:fwrite("registered: ~p~n", [UserName]),
 			clientloop(UserName, dict:new(), Server)
-	end.
-
+	end;
 client(UserName, Server, login) ->
 	Server ! {self(), log_in, UserName},
 	receive
@@ -25,16 +26,16 @@ clientloop(UserName, Channels, Server) ->
 
 		{ChannelID, new_message, {message, UserName, ChannelName, MessageText, SendTime}} ->
 			io:fwrite("~p - [~p]~p: ~p", [SendTime, ChannelName, UserName, MessageText]),
-			clientloop(UserName, NewChannels, Server);
+			clientloop(UserName, Channels, Server);
 
 		{ChannelID, channel_joined, ChannelName} ->
 			NewChannels = join_channel(ChannelName, ChannelID, Channels),
 			clientloop(UserName, NewChannels, Server);
 
-		{_Client, join_channel, ChannelName} ->
+		{Client, join_channel, ChannelName} ->
 			Server ! {self(), join_channel, UserName, ChannelName},
-			clientloop(UserName, NewChannels, Server);
-
+			Client ! {self(), join_successful},
+			clientloop(UserName, Channels, Server)
 	end.
 
 
