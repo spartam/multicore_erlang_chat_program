@@ -1,7 +1,7 @@
 -module(central_server).
 
 % -export([initialize/0, initialize_with/3, central_server/3, typical_session_1/1, typical_session_2/1]).
--export([initialize/0, initialize_with/3, init_central_server/3, typical_session_1/1, typical_session_2/1]).
+-export([initialize/0, initialize_with/3, init_central_server/3, typical_session_1/1, typical_session_2/1, broadcast/2]).
 
 -include_lib("eunit/include/eunit.hrl").
 
@@ -47,13 +47,15 @@ server_loop(Users, LoggedIn, Channels) ->
 
 		{Sender, log_in, UserName} ->
 			New_LoggedIn = sets:add_element(UserName, LoggedIn),
-			broadcast(Channels, {self(), login, UserName, Sender}),
+			spawn_link(?MODULE, broadcast, [Channels, {self(), login, UserName, Sender}]),
+			% broadcast(Channels, {self(), login, UserName, Sender}),
 			Sender ! {self(), logged_in},
 			server_loop(Users, New_LoggedIn, Channels);
 
 		{Sender, log_out, UserName} ->
 			New_LoggedIn = sets:del_element(UserName, LoggedIn),
-			broadcast(Channels, {self(), logout, UserName, Sender}),
+			spawn_link(?MODULE, broadcast, [Channels, {self(), logout, UserName, Sender}]),
+			% broadcast(Channels, {self(), logout, UserName, Sender}),
 			Sender ! {self(), logged_out},
 			server_loop(Users, New_LoggedIn, Channels);
 
@@ -93,7 +95,11 @@ register_user_to_channel(User, Channel, Channels) ->
 
 
 broadcast(Channels, Message) ->
+	% StartTime = os:timestamp(),
 	dict:map(fun (_, PID) -> PID ! Message end, Channels).
+	% Time = timer:now_diff(os:timestamp(), StartTime),
+	% io:format("Channel broadcast time = ~p ms~n",
+ %        [Time / 1000.0]).
 
 send_to_channel(Channel, Channels, Message) ->
 	case dict:find(Channel, Channels) of

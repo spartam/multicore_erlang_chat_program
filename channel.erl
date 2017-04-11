@@ -27,7 +27,7 @@ channel_loop(ChannelName, Users, Messages, Members) ->
 			channel_loop(ChannelName, Users, Messages ++ [Message], Members);
 
 		{_Sender, login, UserName, PID} ->
-			case lists:member(UserName, Members) of 
+			case logged_out_member_check(UserName, Users, Members) of 
 				true -> 
 					NewUsers = dict:store(UserName, PID, Users),
 					% Sender ! {self(), logged_in_channel, ChannelName},
@@ -81,6 +81,25 @@ channel_loop(ChannelName, Users, Messages, Members) ->
 	end.
 
 broadcast(Users, Message) ->
+	% StartTime = os:timestamp(),
 	dict:map(fun (_, Client) ->
 			Client ! {self(), new_message, Message}
-		end, Users), ok.
+		end, Users).
+	% Size = dict:size(Users),
+	% io:fwrite("Users Size: ~w~n", [Size]),
+	% Time = timer:now_diff(os:timestamp(), StartTime),
+	% io:format("Channel to user broadcast time = ~p ms~n",
+ %    	[Time / 1000.0]).
+
+logged_out_member_check(UserName, Logged_in, Members)->
+	case dict:find(UserName, Logged_in) of
+		{ok, Value} ->	%% already logged in
+			false;
+		error ->	%% not logged in
+			case lists:member(UserName, Members) of
+				true ->
+					true;
+				false ->
+					false
+			end
+	end.
