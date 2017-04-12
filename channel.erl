@@ -15,12 +15,11 @@ channel_loop(ChannelName, Users, Messages, Members) ->
 			Sender ! {self(), channel_history, Messages},
 			channel_loop(ChannelName, Users, Messages, Members);
 
-		%% Todo, is sender member of users?
 		{Sender, send_message, UserName, MessageText, SendTime} ->
 			Message = {message, UserName, ChannelName, MessageText, SendTime},
 			UsersWithoutSender = dict:erase(UserName, Users),
 			% Size = dict:size(UsersWithoutSender),
-			% io:fwrite("Size: ~w~n", [Size]),
+			% io:fwrite("Channel loop, Channel: ~p~nMessage: ~p~n", [ChannelName, Message]),
 			spawn_link(?MODULE, broadcast, [UsersWithoutSender, Message]),
 			% broadcast(UsersWithoutSender, Message),
 			Sender ! {self(), message_sent},
@@ -76,7 +75,6 @@ channel_loop(ChannelName, Users, Messages, Members) ->
 			channel_loop(ChannelName, Users, Messages, Members);
 
 		Other ->
-			io:fwrite("~p", [Other]),
 			channel_loop(ChannelName, Users, Messages, Members)
 	end.
 
@@ -85,8 +83,8 @@ broadcast(Users, Message) ->
 	dict:map(fun (_, Client) ->
 			Client ! {self(), new_message, Message}
 		end, Users).
-	% Size = dict:size(Users),
-	% io:fwrite("Users Size: ~w~n", [Size]),
+	% Names = dict:fetch_keys(Users),
+	% io:fwrite("Users: ~p~n", [Names]).
 	% Time = timer:now_diff(os:timestamp(), StartTime),
 	% io:format("Channel to user broadcast time = ~p ms~n",
  %    	[Time / 1000.0]).

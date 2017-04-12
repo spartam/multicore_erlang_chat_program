@@ -79,6 +79,10 @@ server_loop(Users, LoggedIn, Channels) ->
 			NewChannels = send_to_channel(ChannelName, Channels, {Sender, logged_in}),
 			server_loop(Users, LoggedIn, NewChannels);	
 
+		{Sender, channels} ->
+			Sender ! {self(), channels, Channels},
+			server_loop(Users, LoggedIn, Channels);				
+
 		_Other -> 
 			server_loop(Users, LoggedIn, Channels)
 	end.
