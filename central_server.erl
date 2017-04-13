@@ -55,7 +55,7 @@ server_loop(Users, LoggedIn, Channels) ->
 		{Sender, log_out, UserName} ->
 			New_LoggedIn = sets:del_element(UserName, LoggedIn),
 			% spawn_link(?MODULE, broadcast, [Channels, {self(), logout, UserName}]),
-			broadcast(Channels, {self(), logout, UserName, Sender}),
+			broadcast(Channels, {self(), logout, UserName}),
 			Sender ! {self(), logged_out},
 			server_loop(Users, New_LoggedIn, Channels);
 

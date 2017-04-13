@@ -30,6 +30,7 @@ clientloop(UserName, Channels, Server, Messages) ->
 			clientloop(UserName, Channels, Server, Messages ++ [{message, User, ChannelName, MessageText, SendTime}]);
 
 		{ChannelID, channel_joined, ChannelName, ChannelMessages} ->
+			% io:fwrite("Channel joined~n"),
 			NewChannels = join_channel(ChannelName, ChannelID, Channels),
 			NewMessages = lists:merge(ChannelMessages, Messages),
 			clientloop(UserName, NewChannels, Server, NewMessages);
@@ -73,13 +74,13 @@ send_message(_, _, _, 0) -> false;
 send_message(ChannelName, Channels, Message, X) ->
 	case dict:find(ChannelName, Channels) of
 		{ok, ChannelID} ->
-			io:fwrite("send message ~p~p : ~p~n", [ChannelName, ChannelID, Message]),
+			% io:fwrite("send message ~p~p : ~p~n", [ChannelName, ChannelID, Message]),
 			ChannelID ! Message,
 			true;
 		error ->
 			timer:sleep(250),
-			send_message(ChannelName, Channels, Message, X - 1),
-			io:fwrite("You didn't actually believe this would work, did you?~n")
+			send_message(ChannelName, Channels, Message, X - 1)
+			% io:fwrite("You didn't actually believe this would work, did you?~n")
 			% false
 	end.
 

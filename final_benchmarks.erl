@@ -8,8 +8,8 @@ initialize_server() ->
 
 main() ->
 	initialize_server(),
-	register_user(5),
-	Users = login_users(5),
+	register_user(5000),
+	Users = login_users(1000),
 	timer:sleep(10000),
 	send_messages(Users).
 
@@ -96,7 +96,7 @@ wait_for_messages(PID, NumberOfMessages) ->
 	receive
 		{_Serv, history, Messages} ->
 			Len = length(Messages),
-			io:fwrite("~n~p waiting: ~p/~p~n", [PID, Len, NumberOfMessages]),
+			% io:fwrite("~n~p waiting: ~p/~p~n", [PID, Len, NumberOfMessages]),
 			if Len =:= NumberOfMessages
 					-> ok;
 			true 	->

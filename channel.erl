@@ -27,6 +27,7 @@ channel_loop(ChannelName, Users, Messages, Members) ->
 			channel_loop(ChannelName, Users, Messages ++ [Message], Members);
 
 		{_Sender, login, UserName, PID} ->
+			% io:fwrite("Channel loop, login: ~p~nuser: ~p~n", [ChannelName, UserName]),
 			case logged_out_member_check(UserName, Users, Members) of 
 				true -> 
 					NewUsers = dict:store(UserName, PID, Users),
@@ -64,6 +65,7 @@ channel_loop(ChannelName, Users, Messages, Members) ->
 
 		{_Sender, logout, UserName} ->
 			NewUsers = dict:erase(UserName, Users),
+			% io:fwrite("Channel loop, logout: ~p~nuser: ~p~n", [ChannelName, UserName]),
 			channel_loop(ChannelName, NewUsers, Messages, Members);
 
 		{Sender, members} ->
@@ -94,12 +96,14 @@ logged_out_member_check(UserName, Logged_in, Members)->
 
 	case dict:find(UserName, Logged_in) of
 		{ok, _Value} ->	%% already logged in
+			% io:fwrite("~p is already logged in~n", [UserName]),
 			false;
 		error ->	%% not logged in
 			case lists:member(UserName, Members) of
 				true ->
 					true;
 				false ->
+					% io:fwrite("~p is not a member~n", [UserName]),
 					false
 			end
 	end.
