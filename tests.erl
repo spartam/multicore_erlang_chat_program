@@ -20,7 +20,7 @@ register_clients_to_channels() ->
 	io:fwrite("register clients to channels~n"),
 	A ! {self(), join_channel, "Channel1"},
 	receive
-		{_Server, join_successful} ->
+		{A, join_successful} ->
 			io:fwrite("A join successful~n"),
 			ok
 	end,

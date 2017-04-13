@@ -1,45 +1,38 @@
 -module(client).
 
--export([client/3, client_run/0]).
+-export([client/3]).
 
 client(UserName, Server, register) ->
-	% io:fwrite("make client: ~p~n", [UserName]),
 	Server ! {self(), register_user, UserName},
 	receive
 		{_S, user_registered} ->
-			% io:fwrite("registered: ~p~n", [UserName]),
 			clientloop(UserName, dict:new(), Server, [])
 	end;
 client(UserName, Server, login) ->
 	Server ! {self(), log_in, UserName},
 	receive
-		{Server, logged_in} ->
+		{_Serv, logged_in} ->
 		clientloop(UserName, dict:new(), Server, [])
 	end.
 
 
 clientloop(UserName, Channels, Server, Messages) ->
 	receive
-		{ChannelServer, logged_in_channel, Name} ->
-			NewChannels = join_channel(Name, ChannelServer, Channels),
-			clientloop(UserName, NewChannels, Server, Messages);
-
 		{_Client, send_message, ChannelName, MessageText} ->
 			SendTime = os:system_time(),
 			Message = {message, UserName, ChannelName, MessageText, SendTime},
 			ChannelMsg = {self(), send_message, UserName, MessageText, SendTime},
-			send_message(ChannelName, Channels, ChannelMsg),
+			send_message(ChannelName, Channels, ChannelMsg, 5),
 			clientloop(UserName, Channels, Server, Messages ++ [Message]);
 
-		% {<0.40.0>,new_message, {message,"ytreza","Channel2","How is everyone doing?", 1491966910295328038}}
-
 		{_ChannelID, new_message, {message, User, ChannelName, MessageText, SendTime}} ->
-			io:fwrite("~p - [~p]~p: ~p~n", [SendTime, ChannelName, User, MessageText]),
+			% io:fwrite("~p - [~p]~p: ~p~n", [SendTime, ChannelName, User, MessageText]),
 			clientloop(UserName, Channels, Server, Messages ++ [{message, User, ChannelName, MessageText, SendTime}]);
 
-		{ChannelID, channel_joined, ChannelName} ->
+		{ChannelID, channel_joined, ChannelName, ChannelMessages} ->
 			NewChannels = join_channel(ChannelName, ChannelID, Channels),
-			clientloop(UserName, NewChannels, Server, Messages);
+			NewMessages = lists:merge(ChannelMessages, Messages),
+			clientloop(UserName, NewChannels, Server, NewMessages);
 
 		{Client, join_channel, ChannelName} ->
 			% io:fwrite("join_channel~n"),
@@ -56,7 +49,11 @@ clientloop(UserName, Channels, Server, Messages) ->
 			Client ! {self(), history, Messages},
 			clientloop(UserName, Channels, Server, Messages);
 
-		Other ->
+		{_Client, logout} ->
+			Server ! {self(), log_out, UserName};
+			% clientloop(UserName, Channels, Server, Messages);
+
+		_Other ->
 			% io:fwrite("Client Other: ~p~n", [Other]),
 			clientloop(UserName, Channels, Server, Messages)
 	end.
@@ -72,17 +69,20 @@ join_channel(Name, ChannelID, Channels) ->
 			NewChannels
 	end.
 
-send_message(ChannelName, Channels, Message) ->
+send_message(_, _, _, 0) -> false;
+send_message(ChannelName, Channels, Message, X) ->
 	case dict:find(ChannelName, Channels) of
 		{ok, ChannelID} ->
-			% io:fwrite("send message ~p~p : ~p~n", [ChannelName, ChannelID, Message]),
+			io:fwrite("send message ~p~p : ~p~n", [ChannelName, ChannelID, Message]),
 			ChannelID ! Message,
 			true;
 		error ->
-			% io:fwrite("You didn't actually believe this would work, did you?~n"),
-			false
+			timer:sleep(250),
+			send_message(ChannelName, Channels, Message, X - 1),
+			io:fwrite("You didn't actually believe this would work, did you?~n")
+			% false
 	end.
 
 
-client_run() ->
-	{ok, [Value]} = io:fread("username > ", "~s").
+% client_run() ->
+% 	{ok, [Value]} = io:fread("username > ", "~s").

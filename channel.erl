@@ -17,19 +17,20 @@ channel_loop(ChannelName, Users, Messages, Members) ->
 
 		{Sender, send_message, UserName, MessageText, SendTime} ->
 			Message = {message, UserName, ChannelName, MessageText, SendTime},
+			% io:fwrite("Channel send message by: ~p~n", [UserName]),
 			UsersWithoutSender = dict:erase(UserName, Users),
 			% Size = dict:size(UsersWithoutSender),
 			% io:fwrite("Channel loop, Channel: ~p~nMessage: ~p~n", [ChannelName, Message]),
-			spawn_link(?MODULE, broadcast, [UsersWithoutSender, Message]),
-			% broadcast(UsersWithoutSender, Message),
+			% spawn_link(?MODULE, broadcast, [UsersWithoutSender, Message]),
+			broadcast(UsersWithoutSender, Message),
 			Sender ! {self(), message_sent},
 			channel_loop(ChannelName, Users, Messages ++ [Message], Members);
 
-		{Sender, login, UserName, PID} ->
+		{_Sender, login, UserName, PID} ->
 			case logged_out_member_check(UserName, Users, Members) of 
 				true -> 
 					NewUsers = dict:store(UserName, PID, Users),
-					Sender ! {self(), logged_in_channel, ChannelName},
+					PID ! {self(), channel_joined, ChannelName, Messages},
 					channel_loop(ChannelName, NewUsers, Messages, Members);
 				false ->
 					channel_loop(ChannelName, Users, Messages, Members)
@@ -41,7 +42,7 @@ channel_loop(ChannelName, Users, Messages, Members) ->
 					Sender ! {self(), already_member},
 					channel_loop(ChannelName, Users, Messages, Members);
 				false ->
-					Sender ! {self(), channel_joined, ChannelName},
+					Sender ! {self(), channel_joined, ChannelName, Messages},
 					NewUsers = dict:store(UserName, Sender, Users),
 					channel_loop(ChannelName, NewUsers, Messages, Members ++ [UserName])
 			end;
@@ -74,7 +75,7 @@ channel_loop(ChannelName, Users, Messages, Members) ->
 			Sender ! {self(), logged_in, Logged_in},
 			channel_loop(ChannelName, Users, Messages, Members);
 
-		Other ->
+		_Other ->
 			channel_loop(ChannelName, Users, Messages, Members)
 	end.
 
@@ -83,15 +84,16 @@ broadcast(Users, Message) ->
 	dict:map(fun (_, Client) ->
 			Client ! {self(), new_message, Message}
 		end, Users).
-	% Names = dict:fetch_keys(Users),
-	% io:fwrite("Users: ~p~n", [Names]).
+	% Names = dict:fetch_keys(Users).
+	% io:fwrite("broadcast to : ~p~n", [Names]).
 	% Time = timer:now_diff(os:timestamp(), StartTime),
 	% io:format("Channel to user broadcast time = ~p ms~n",
  %    	[Time / 1000.0]).
 
 logged_out_member_check(UserName, Logged_in, Members)->
+
 	case dict:find(UserName, Logged_in) of
-		{ok, Value} ->	%% already logged in
+		{ok, _Value} ->	%% already logged in
 			false;
 		error ->	%% not logged in
 			case lists:member(UserName, Members) of
