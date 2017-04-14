@@ -63,9 +63,10 @@ channel_loop(ChannelName, Users, Messages, Members) ->
 			NewMembers = lists:delete(UserName, Members),
 			channel_loop(ChannelName, NewUsers, Messages, NewMembers);
 
-		{_Sender, logout, UserName} ->
+		{_Sender, logout, UserName, Client} ->
 			NewUsers = dict:erase(UserName, Users),
 			% io:fwrite("Channel loop, logout: ~p~nuser: ~p~n", [ChannelName, UserName]),
+			Client ! {self(), channel_logged_out, ChannelName},
 			channel_loop(ChannelName, NewUsers, Messages, Members);
 
 		{Sender, members} ->

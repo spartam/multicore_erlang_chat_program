@@ -50,8 +50,10 @@ clientloop(UserName, Channels, Server, Messages) ->
 			Client ! {self(), history, Messages},
 			clientloop(UserName, Channels, Server, Messages);
 
-		{_Client, logout} ->
-			Server ! {self(), log_out, UserName};
+		{Client, logout} ->
+			Server ! {self(), log_out, UserName},
+			ChannelNames = dict:fetch_keys(Channels),
+			log_out(Client, ChannelNames);
 			% clientloop(UserName, Channels, Server, Messages);
 
 		_Other ->
@@ -83,6 +85,17 @@ send_message(ChannelName, Channels, Message, X) ->
 			% io:fwrite("You didn't actually believe this would work, did you?~n")
 			% false
 	end.
+
+log_out(Client, []) -> Client ! {self(), logged_out};
+log_out(Client, Channels) ->
+	receive
+		{CID, channel_logged_out, ChannelName} ->
+			Reduced = lists:delete(ChannelName, Channels),
+			log_out(Client, Reduced);
+		_Other ->
+			log_out(Client, Channels)
+	end.
+
 
 
 % client_run() ->

@@ -8,28 +8,36 @@ initialize_server() ->
 
 main() ->
 	initialize_server(),
-	register_user(5000),
+	register_user(5000, 50),
 	Users = login_users(1000),
-	timer:sleep(10000),
-	send_messages(Users).
+	timer:sleep(2500),
+	send_messages(Users, 50, 50),
+	io:fwrite("~n--~n").
 
 
-register_user(NumberOfMember) ->
+register_user(NumberOfMember, NumberOfChannels) ->
 	io:fwrite("registering peeps~n"),
 	statistics(runtime),        % CPU time, summed for all threads
     StartTime = os:timestamp(), % Wall clock time
 
 	ClientsList = lists:map(fun(I) ->
 								ClientID = spawn(client, client, [I, central_server, register]),
-								ClientID ! {self(), join_channel, "Channel1"},
+								ClientID ! {self(), join_channel, I rem NumberOfChannels},
 								receive
 									{ClientID, join_successful} ->
 										{I, ClientID}
-								end,
-								ClientID ! {self(), logout}
+								end
 					 		end, lists:seq(1, NumberOfMember)),
 
 	Clients = dict:from_list(ClientsList),
+
+	dict:map(fun (_I, ClientID) ->
+				ClientID ! {self(), logout},
+				receive
+					{_S1, logged_out} ->
+						ok
+				end
+			end, Clients),
 
 	{_, Time1} = statistics(runtime),
     Time2 = timer:now_diff(os:timestamp(), StartTime),
@@ -55,21 +63,40 @@ login_users(NumberOfUsers) ->
         [Time1, Time2 / 1000.0]),
     Users.
 
-send_messages(Users) ->
+send_messages(Users, NumberOfChannels, MessagesPerUser) ->
 	io:fwrite("~npeeps stalking peeps~n"),
 	
 	statistics(runtime),        % CPU time, summed for all threads
     StartTime = os:timestamp(), % Wall clock time
 
-	dict:map(fun (_I, PID) ->
+	dict:map(fun (I, PID) ->
 				% io:fwrite("Send, ~p~n", [I]),
-				PID ! {self(), send_message, "Channel1", "Checking in."}
+				lists:foreach(fun (_J) ->
+					PID ! {self(), send_message, I rem NumberOfChannels, "Checking in."}
+				end, lists:seq(1, MessagesPerUser))
 			 end, Users),
 	
-	Size = dict:size(Users),
+	% Size = dict:size(Users),
 
 	dict:map(fun (_I, PID) ->
-				% spawn(?MODULE, wait_for_messages, [self(), PID, Size]) 
+				% spawn(?MODULE, wait_for_messages, [self(), PID, Size])
+				PID ! {self(), channels},
+				receive
+					{_S1, channels, [Channel]} ->
+						ok
+				end,
+				central_server ! {self(), channels},
+				receive
+					{_S2, channels, ChannelsDict} ->
+						ok
+				end,
+				{ok, ChannelID} = dict:find(Channel, ChannelsDict),
+				ChannelID ! {self(), logged_in},
+				receive
+					{_S3, logged_in, Logged_in} ->
+						ok
+				end,
+				Size = length(Logged_in) * MessagesPerUser,
 				wait_for_messages(PID, Size)
 			 end, Users),
 
@@ -97,7 +124,7 @@ wait_for_messages(PID, NumberOfMessages) ->
 		{_Serv, history, Messages} ->
 			Len = length(Messages),
 			% io:fwrite("~n~p waiting: ~p/~p~n", [PID, Len, NumberOfMessages]),
-			if Len =:= NumberOfMessages
+			if Len >= NumberOfMessages
 					-> ok;
 			true 	->
 				wait_for_messages(PID, NumberOfMessages)

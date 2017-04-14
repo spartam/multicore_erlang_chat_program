@@ -1,4 +1,6 @@
-for i in {16..16}
+mkdir benchmarks
+
+for i in {16..32}
 do
     # echo "---"
     # echo "> fib, $i threads"
@@ -6,13 +8,17 @@ do
     # echo "---"
     # echo "> get_channel_history, $i threads"
     # erl +S $i -noshell -s benchmark test_get_channel_history -s init stop > output-get_channel_history-$i.txt
-    echo "> send_message, $i threads"
-    erl +S $i -noshell -s benchmark test_send_message -s init stop > output-send_message-$i.txt
+    # echo "> send_message, $i threads"
+    # erl +S $i -noshell -s benchmark test_send_message -s init stop > output-send_message-$i.txt
 
-    echo "---"
+    # echo "---"
 
-    echo "final benchmarks $i threads"
-    erl +S $i -noshell -s final_benchmarks main -s init stop > benchmarks-$i.txt
+    echo "final benchmarks $i threads going to 32 threads"
+    for j in {1..30}
+    do
+    	echo "run $j of 30 for statistical relevance"
+    	erl +S $i -noshell -s final_benchmarks main -s init stop >> benchmarks/benchmarks-$i.txt
+    done
     
     echo "---"
 done
