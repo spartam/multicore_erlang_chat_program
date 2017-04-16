@@ -8,10 +8,11 @@ initialize_server() ->
 
 main() ->
 	initialize_server(),
-	register_user(5000, 50),
+	register_user(5000, 10),
 	Users = login_users(1000),
 	timer:sleep(2500),
-	send_messages(Users, 50, 50),
+	send_messages(Users, 10, 50),
+	get_history(),
 	io:fwrite("~n--~n").
 
 
@@ -30,6 +31,9 @@ register_user(NumberOfMember, NumberOfChannels) ->
 					 		end, lists:seq(1, NumberOfMember)),
 
 	Clients = dict:from_list(ClientsList),
+
+	Pr = length(processes()), 
+	io:fwrite("processes: ~p", [Pr]),
 
 	dict:map(fun (_I, ClientID) ->
 				ClientID ! {self(), logout},
@@ -72,11 +76,14 @@ send_messages(Users, NumberOfChannels, MessagesPerUser) ->
 	dict:map(fun (I, PID) ->
 				% io:fwrite("Send, ~p~n", [I]),
 				lists:foreach(fun (_J) ->
+					% io:fwrite("Client ~p Messages ~p~n", [I, J]),
 					PID ! {self(), send_message, I rem NumberOfChannels, "Checking in."}
 				end, lists:seq(1, MessagesPerUser))
 			 end, Users),
 	
 	% Size = dict:size(Users),
+
+	% io:fwrite("~nwaiting for messages~n"),
 
 	dict:map(fun (_I, PID) ->
 				% spawn(?MODULE, wait_for_messages, [self(), PID, Size])
@@ -132,6 +139,37 @@ wait_for_messages(PID, NumberOfMessages) ->
 	end.
 
 
+get_history() ->
+	io:fwrite("~nget_history~n"),
+
+	statistics(runtime),        % CPU time, summed for all threads
+    StartTime = os:timestamp(), % Wall clock time
+
+	central_server ! {self(), channels},
+
+	receive
+		{_Serv, channels, Channels} ->
+			ok
+	end,
+
+	ChannelsSize = dict:size(Channels),
+
+	dict:map(fun (_I, PID) ->
+				PID ! {self(), history}
+			 end, Channels),
+
+	wait_for_histories(ChannelsSize),
 
 
 
+	{_, Time1} = statistics(runtime),
+    Time2 = timer:now_diff(os:timestamp(), StartTime),
+    io:format("CPU time = ~p ms~nWall clock time = ~p ms~n",
+        [Time1, Time2 / 1000.0]).
+
+wait_for_histories(0) -> ok;
+wait_for_histories(X) ->
+	receive
+		{_Channel, channel_history, _Messages} ->
+			wait_for_histories(X - 1)
+	end.

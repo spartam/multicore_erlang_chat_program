@@ -10,6 +10,7 @@ create(Name, Users, Members, Messages) ->
 %% Messages is a list
 %% Members is a list
 channel_loop(ChannelName, Users, Messages, Members) ->
+	% io:fwrite("Channel ~p queue length ~p~n", [ChannelName, erlang:process_info(self(), message_queue_len)]),
 	receive 
 		{Sender, history} ->
 			Sender ! {self(), channel_history, Messages},
@@ -25,6 +26,7 @@ channel_loop(ChannelName, Users, Messages, Members) ->
 			broadcast(UsersWithoutSender, Message),
 			Sender ! {self(), message_sent},
 			channel_loop(ChannelName, Users, Messages ++ [Message], Members);
+			% channel_loop(ChannelName, Users, Messages, Members);
 
 		{_Sender, login, UserName, PID} ->
 			% io:fwrite("Channel loop, login: ~p~nuser: ~p~n", [ChannelName, UserName]),

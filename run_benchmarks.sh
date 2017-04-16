@@ -1,6 +1,6 @@
 mkdir benchmarks
 
-for i in {16..32}
+for i in {1..8}
 do
     # echo "---"
     # echo "> fib, $i threads"
@@ -13,10 +13,10 @@ do
 
     # echo "---"
 
-    echo "final benchmarks $i threads going to 32 threads"
-    for j in {1..30}
+    echo "final benchmarks $i threads going to 8 threads"
+    for j in {1..50}
     do
-    	echo "run $j of 30 for statistical relevance"
+    	echo "run $j of 50 for statistical relevance"
     	erl +S $i -noshell -s final_benchmarks main -s init stop >> benchmarks/benchmarks-$i.txt
     done
     
